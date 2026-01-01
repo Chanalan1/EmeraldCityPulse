@@ -5,6 +5,12 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app) 
 
+# testing my pytest environment
+@app.route('/')
+def home():
+    return "Hello!"
+
+
 @app.route('/api/time')
 def get_current_time():
     
