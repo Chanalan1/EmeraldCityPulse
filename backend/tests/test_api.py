@@ -2,7 +2,9 @@ import pytest
 import requests
 import os
 from dotenv import load_dotenv
-from api import get_data
+from api import get_date, get_coordinates, get_data
+
+
 
 load_dotenv()
 
@@ -38,3 +40,28 @@ def test_get_data_respects_limit():
     limit_count = 5
     results = get_data(limit=limit_count)
     assert len(results) == limit_count
+
+# test to make sure the get date function properly returns the right format
+# ISO 8601 date/time has 19 characters 
+def test_get_date_format():
+    date = get_date('30d')
+    assert len(date) == 19
+
+# testing the accuracy of the latitude and longitude helper given an address/location
+def test_location():
+    coords = get_coordinates("Space Needle")
+    lat = coords[0]
+    lon = coords[1]
+    # lat and long of the space needle
+    assert round(lat, 2) == 47.62
+    assert round(lon, 2) == -122.35
+
+# testing to see if a report can be generated given a location and radius from that location
+def test_radius_of_search():
+    # Space Needle coordinates
+    lat, lon = 47.62, -122.35
+
+    results = get_data(lat=lat, lon=lon, time_range='3y', radius=1000, limit=5)
+
+    assert isinstance(results, list)
+
