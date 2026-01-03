@@ -1,16 +1,67 @@
 import pytest
-from home import app
+import requests
+import os
+from dotenv import load_dotenv
+from api import get_date, get_coordinates, get_data
 
-#testing pytest starter code
-@pytest.fixture
-def client():
-    app.config['TESTING'] = True
-    with app.test_client() as client:
-        yield client
 
-def test_home_route(client):
-    response = client.get('/')
+
+load_dotenv()
+
+# test to see if api endpoint is reachable
+# if response is 200 meaning client request worked
+def test_api_endpoint():
+
+    url = 'https://data.seattle.gov/resource/tazs-3rd5.json' # the endpoint for the Seattle data base
+    headers = {"X-App-Token": os.getenv("SEATTLE_API_KEY_ID")}
+    response = requests.get(url, headers=headers, params={"$limit": 1})
+
     assert response.status_code == 200
 
-def test_dummy():
-    assert True # should return true
+# test to see if the request we get is returned as JSON format
+# checks to see if connection is good first, then checks the response type which should be JSON
+def test_isJSON():
+
+    url = 'https://data.seattle.gov/resource/tazs-3rd5.json' 
+    headers = {"X-App-Token": os.getenv("SEATTLE_API_KEY_ID")}
+    response = requests.get(url, headers=headers, params={"$limit": 1})
+
+    assert response.status_code == 200
+    assert "application/json" in response.headers["Content-Type"]
+
+# tests to make sure the logic of getting data returns actual data (such as correct data structure and actual data)
+def test_get_data_returns_list():
+    results = get_data()
+    assert isinstance(results, list)
+    assert len(results) > 0  
+
+# tests to make sure the limit works and we get exactly how much is asked of us
+def test_get_data_respects_limit():
+    limit_count = 5
+    results = get_data(limit=limit_count)
+    assert len(results) == limit_count
+
+# test to make sure the get date function properly returns the right format
+# ISO 8601 date/time has 19 characters 
+def test_get_date_format():
+    date = get_date('30d')
+    assert len(date) == 19
+
+# testing the accuracy of the latitude and longitude helper given an address/location
+def test_location():
+    coords = get_coordinates("Space Needle")
+    lat = coords[0]
+    lon = coords[1]
+    # lat and long of the space needle
+    assert round(lat, 2) == 47.62
+    assert round(lon, 2) == -122.35
+
+# testing to see if a report can be generated given a location and radius from that location
+def test_radius_of_search():
+    # Space Needle coordinates
+    lat, lon = 47.62, -122.35
+
+    results = get_data(lat=lat, lon=lon, time_range='3y', radius=1000, limit=5)
+
+    assert isinstance(results, list)
+
