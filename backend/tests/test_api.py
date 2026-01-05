@@ -2,7 +2,7 @@ import pytest
 import requests
 import os
 from dotenv import load_dotenv
-from api import get_date, get_coordinates, get_data
+from api import get_date, get_coordinates, get_data, format_incident_date, calculate_distance, process_report_data, get_distance_value
 
 
 
@@ -65,3 +65,31 @@ def test_radius_of_search():
 
     assert isinstance(results, list)
 
+# test to ensure the date is converted to human-readable format
+def test_format_incident_date():
+    raw = "2026-01-04T14:30:00"
+    formatted = format_incident_date(raw)
+    assert formatted == "Jan 04, 2026, 02:30 PM"
+
+# test to ensure the distance calculation returns an integer in meters
+def test_calculate_distance():
+    dist = calculate_distance(47.6205, -122.3493, 47.6089, -122.3401)
+    assert isinstance(dist, int)
+    assert 1400 < dist < 1700
+
+# test to ensure the sorting librarian extracts the hidden raw_dist value
+def test_get_distance_value():
+    card = {"raw_dist": 500}
+    assert get_distance_value(card) == 500
+
+# test to ensure closest incident is first and empty data is handled
+def test_process_report_data():
+    fake_data = [
+        {'latitude': '48.0', 'longitude': '-123.0'},
+        {'latitude': '47.6', 'longitude': '-122.3'}
+    ]
+    result = process_report_data(fake_data, 47.6, -122.3)
+    assert result['reports'][0]['raw_dist'] < result['reports'][1]['raw_dist']
+    
+    empty_result = process_report_data([], 47.6, -122.3)
+    assert empty_result['status'] == "empty"
