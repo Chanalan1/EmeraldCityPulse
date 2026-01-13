@@ -11,6 +11,9 @@ from math import radians, cos, sin, asin, sqrt
 " reference: https://dev.socrata.com/docs/queries/ -> how to write Socrata QL queries" 
 "reference: https://geopy.readthedocs.io/en/stable/#nominatim -> geopy nominatim "
 
+
+
+
 # request changes the JSON to a python dictionary/list
 def get_data(lat=None, lon=None, neighborhood=None, time_range='30d', radius=600, limit=20):
     """
@@ -28,12 +31,14 @@ def get_data(lat=None, lon=None, neighborhood=None, time_range='30d', radius=600
     """
 
     url = 'https://data.seattle.gov/resource/tazs-3rd5.json'
-    headers = {"X-App-Token": os.getenv("SEATTLE_API_KEY_ID")}
+    headers = {"X-App-Token": os.getenv("SEATTLE_API_KEY")}
     
     # create the filters for SocrataQL by adding time cutoff
     # Ex: all most recent reports from 30 days starting from December 1, 2025
     date_helper = get_date(time_range)
     search = f"report_date_time > '{date_helper}'"
+    api_key = os.getenv("SEATTLE_API_KEY")
+    print(f"DEBUG: API Key found? {api_key is not None}")
     
 
     # Priorities neighborhood address then looks to append lat and long
@@ -41,8 +46,24 @@ def get_data(lat=None, lon=None, neighborhood=None, time_range='30d', radius=600
         search += f" AND neighborhood = '{neighborhood.upper()}'"
 
     elif lat and lon:
-        # within_circle SoQL function for geospatial quaries
-        search += f" AND within_circle(canvas_location, {lat}, {lon}, {radius})" 
+        
+        # geospatial calculation to determine search box around user, 1 degree = 111.... meters
+        lat_offset = radius / 111139.0
+        lon_offset = radius / (111139.0 * cos(radians(lat)))
+        
+        min_lat, max_lat = lat - lat_offset, lat + lat_offset
+        min_lon, max_lon = lon - lon_offset, lon + lon_offset
+
+        # gets rid of all data that has redacted from report for parsing purposes (due to privacy reasons from city)
+        search += " AND latitude != 'REDACTED' AND longitude != 'REDACTED'"
+
+       # database requires lat/long as Text strings rather than int, changes to int then into string
+        search += f" AND latitude::number BETWEEN {min_lat} AND {max_lat}"
+        search += f" AND longitude::number BETWEEN {min_lon} AND {max_lon}"
+        
+        
+
+    print(f"DEBUG Socrata Query: {search}")
 
     params = {
         "$where": search,
@@ -55,6 +76,9 @@ def get_data(lat=None, lon=None, neighborhood=None, time_range='30d', radius=600
     if r.status_code == 200:
         return r.json()
     else:
+        # PRINT THE ERROR so we can see it in the terminal!
+        print(f" API ERROR: {r.status_code}")
+        print(f" MESSAGE: {r.text}")
         return []
 
 def get_date(time_range):
@@ -191,6 +215,13 @@ def process_report_data(raw_data, user_lat, user_lon):
     processed_list = []
     
     for item in raw_data:
+        try:
+            report_lat = float(item.get('latitude'))
+            report_lon = float(item.get('longitude'))
+        except (ValueError, TypeError):
+            continue
+
+        dist = calculate_distance(user_lat, user_lon, report_lat, report_lon)
         # Pull coordinates from the database (default to 0 if missing)
         report_lat = float(item.get('latitude', 0))
         report_lon = float(item.get('longitude', 0))

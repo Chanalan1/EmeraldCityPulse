@@ -12,8 +12,10 @@ CORS(app)
 def search():
 
     address = request.args.get('address')
+    full_address = f"{address}, Seattle, WA"
+    
 
-    results = main_search(address)
+    results = main_search(full_address, radius=1000, time_range='1y')
     return jsonify(results)
 
 if __name__ == '__main__':
