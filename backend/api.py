@@ -15,7 +15,7 @@ from math import radians, cos, sin, asin, sqrt
 
 
 # request changes the JSON to a python dictionary/list
-def get_data(lat=None, lon=None, neighborhood=None, time_range='30d', radius=600, limit=20):
+def get_data(lat=None, lon=None, neighborhood=None, time_range='1w', radius=250, limit=20, sort_order="DESC"):
     """
     Grabs the latest crime incidents from Seattle Open Data Portal API
     
@@ -68,18 +68,27 @@ def get_data(lat=None, lon=None, neighborhood=None, time_range='30d', radius=600
     params = {
         "$where": search,
         "$limit": limit,
-        "$order": "report_date_time DESC"
+        "$order": f"report_date_time {sort_order}" 
     }
 
-    r = requests.get(url, headers=headers, params=params, timeout=10)
-
-    if r.status_code == 200:
-        return r.json()
-    else:
-        # PRINT THE ERROR so we can see it in the terminal!
-        print(f" API ERROR: {r.status_code}")
-        print(f" MESSAGE: {r.text}")
+    try:
+        # Increased timeout to 60 seconds
+        # error handling to see error messagei fails
+        r = requests.get(url, headers=headers, params=params, timeout=60)
+        
+        if r.status_code == 200:
+            return r.json()
+        else:
+            print(f" API ERROR: {r.status_code} - {r.text}")
+            return []
+            
+    except requests.exceptions.ReadTimeout:
+        print(" DATABASE TIMEOUT: The Seattle API took too long to respond.")
+        return [] 
+    except requests.exceptions.RequestException as e:
+        print(f"⚠️CONNECTION ERROR: {e}")
         return []
+    
 
 def get_date(time_range):
     """
@@ -231,7 +240,7 @@ def process_report_data(raw_data, user_lat, user_lon):
         
         # creating our "report" back to the user
         card = {
-            "type": item.get('offense_description', 'Incident Reported'),
+            "type": item.get('offense_sub_category', item.get('offense_category', 'Incident Reported')),
             "date": format_incident_date(item.get('report_date_time')),
             "distance": f"{dist}m away",  
             "raw_dist": dist,             
@@ -244,27 +253,49 @@ def process_report_data(raw_data, user_lat, user_lon):
     
     return {"status": "success", "reports": processed_list}
 
+def get_date(time_range):
+    """
+    Helper function to calculate the date format needed for the database as a string
+    """
+    now = datetime.now()
 
-def main_search(address, time_range='30d', radius=600):
-    """
-    The main function that connects geocoding, API fetching, and data processing.
-    
-    Parameters:
-        address(str): The physical address entered by the user
-        time_range(str): The timeframe string (e.g., '7d', '30d')
-        radius(int): The search radius in meters
-        
-    Returns:
-        The final processed results ready for the web interface
-    """
-    # convert address to coordinates
+    if time_range == '1w':
+        delta = timedelta(days=7)
+    elif time_range == '2w':
+        delta = timedelta(days=14)
+    elif time_range == '1m':
+        delta = timedelta(days=30)
+    elif time_range == '3m':
+        delta = timedelta(days=90)  
+    elif time_range == '6m':
+        delta = timedelta(days=180)
+    elif time_range == '1y':
+        delta = timedelta(days=365)
+    elif time_range == '3y':
+        delta = timedelta(days=1095)
+    else:
+        # Fallback default as 30 days
+        delta = timedelta(days=30)
+
+    calculated_time = now - delta
+    return calculated_time.strftime("%Y-%m-%dT%H:%M:%S")
+
+def main_search(address, time_range='1w', radius=250):
     lat, lon = get_coordinates(address)
-    
     if lat is None:
-        return {"status": "error", "message": "Could not find that address. Please try again."}
+        return {"status": "error", "message": "Could not find address."}
+
     
-    # fetch raw data from Seattle API
-    raw_data = get_data(lat=lat, lon=lon, time_range=time_range, radius=radius)
+    # If timeframe is > 1 week, start from the bottom of the date range (Oldest First)
+    if time_range in ['1w']:
+        order = "DESC" # Newest first for quick checks
+    else:
+        order = "ASC"  # Oldest first for deep history checks
+
+    raw_data = get_data(lat=lat, lon=lon, time_range=time_range, radius=radius, sort_order=order)
     
-    # process, format, and sort the data
-    return process_report_data(raw_data, lat, lon)
+    processed = process_report_data(raw_data, lat, lon)
+    processed['lat'] = lat
+    processed['lon'] = lon
+    
+    return processed

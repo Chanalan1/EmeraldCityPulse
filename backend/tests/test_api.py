@@ -3,6 +3,7 @@ import requests
 import os
 from dotenv import load_dotenv
 from api import get_date, get_coordinates, get_data, format_incident_date, calculate_distance, process_report_data, get_distance_value
+from unittest.mock import patch, MagicMock
 
 
 
@@ -56,14 +57,6 @@ def test_location():
     assert round(lat, 2) == 47.62
     assert round(lon, 2) == -122.35
 
-# testing to see if a report can be generated given a location and radius from that location
-def test_radius_of_search():
-    # Space Needle coordinates
-    lat, lon = 47.62, -122.35
-
-    results = get_data(lat=lat, lon=lon, time_range='3y', radius=1000, limit=5)
-
-    assert isinstance(results, list)
 
 # test to ensure the date is converted to human-readable format
 def test_format_incident_date():
@@ -93,3 +86,22 @@ def test_process_report_data():
     
     empty_result = process_report_data([], 47.6, -122.3)
     assert empty_result['status'] == "empty"
+
+
+# test to ensure that crimes with none return empty and not crash (edgecase)
+# mock test to not send real api to database
+@patch('api.requests.get')
+@patch('api.os.getenv')
+def test_no_results_found(mock_getenv, mock_get):
+    mock_getenv.return_value = 'fake_token'
+    
+    # testing response
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = []
+    mock_get.return_value = mock_response
+
+    results = get_data(lat=47.6, lon=-122.3)
+    
+    # makes sure the list is empty
+    assert results == []
