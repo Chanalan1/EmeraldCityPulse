@@ -9,7 +9,7 @@ from math import radians, cos, sin, asin, sqrt
 " reference: https://requests.readthedocs.io/en/latest/user/quickstart/  -> custom headers"
 " reference: https://dev.socrata.com/docs/authentication.html -> how to authenticate"
 " reference: https://dev.socrata.com/docs/queries/ -> how to write Socrata QL queries" 
-"reference: https://geopy.readthedocs.io/en/stable/#nominatim -> geopy nominatim "
+" reference: https://geopy.readthedocs.io/en/stable/#nominatim -> geopy nominatim "
 
 
 
@@ -244,8 +244,11 @@ def process_report_data(raw_data, user_lat, user_lon):
             "date": format_incident_date(item.get('report_date_time')),
             "distance": f"{dist}m away",  
             "raw_dist": dist,             
-            "coords": [report_lat, report_lon]
-        }
+            "coords": [report_lat, report_lon],
+            "location": item.get('hundred_block_location', 'Location Unknown'), 
+            "precinct": item.get('precinct', 'Unknown'),
+            "case_number": item.get('report_number', 'N/A')
+}
         processed_list.append(card)
 
     # helper function to convert string informatin into int and rank the distances 
