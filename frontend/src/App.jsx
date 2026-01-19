@@ -7,9 +7,9 @@ function App() {
   const [error, setError] = useState(null);
   const [mapCenter, setMapCenter] = useState([47.6062, -122.3321]);
   
-  // New states for filtering
-  const [radius, setRadius] = useState(1000);
-  const [timeRange, setTimeRange] = useState('1y');
+  
+  const [radius, setRadius] = useState(250); 
+  const [timeRange, setTimeRange] = useState('1w');
 
   const handleSearch = async (address) => {
     if (!address) return;
@@ -17,11 +17,10 @@ function App() {
     setError(null);
 
     try {
-      // 1. Send request with dynamic radius and time parameters
+      
       const url = `http://127.0.0.1:5000/api/search?address=${encodeURIComponent(address)}&radius=${radius}&time_range=${timeRange}`;
       const response = await fetch(url);
       
-      // 2. Check if the server responded okay
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
@@ -30,7 +29,6 @@ function App() {
       if (data.status === "success") {
         setReports(data.reports);
         
-        // --- 🗺️ UPDATE MAP CENTER ---
         if (data.metadata && data.metadata.lat && data.metadata.lon) {
           setMapCenter([data.metadata.lat, data.metadata.lon]);
         }
@@ -51,7 +49,9 @@ function App() {
         
         <h1 style={{ textAlign: 'center', fontSize: '3rem', marginBottom: '10px' }}>Emerald City Pulse</h1>
         <p style={{ textAlign: 'center', color: '#ccc', marginBottom: '30px' }}>Real-time Seattle Crime Data by Proximity</p>
-        <p style={{ textAlign: 'center', color: '#ccc', marginBottom: '15px' }}>Warning: When searching high density neighborhoods (ex:downtown), you might get timed out due to how dense reports are, please specify the specific address or broadent search for faster results if you are timed out!</p>
+        <p style={{ textAlign: 'center', color: '#888', fontSize: '0.9rem', marginBottom: '15px' }}>
+          Warning: Dense areas like Downtown may cause timeouts. Try a smaller radius or shorter timeframe for faster results.
+        </p>
 
         <div style={{ backgroundColor: '#1a1a1a', padding: '20px', borderRadius: '12px', border: '1px solid #333', marginBottom: '30px' }}>
           <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
@@ -88,7 +88,6 @@ function App() {
             </button>
           </div>
 
-          {/* Filter Controls */}
           <div style={{ display: 'flex', gap: '20px', fontSize: '0.9rem' }}>
             <div style={{ flex: 1 }}>
               <label style={{ display: 'block', marginBottom: '8px', color: '#888' }}>
@@ -109,7 +108,7 @@ function App() {
                 style={{ width: '100%', padding: '8px', borderRadius: '4px', backgroundColor: '#242424', color: 'white', border: '1px solid #444' }}
               >
                 <option value="1w">Past Week</option>
-                <option value="2w">Past Two Week</option>
+                <option value="2w">Past Two Weeks</option>
                 <option value="1m">Past Month</option>
                 <option value="3m">Past 3 Months</option>
                 <option value="6m">Past 6 Months</option>
@@ -131,18 +130,44 @@ function App() {
 
           {reports.map((report, index) => (
             <div key={index} style={{ 
-              padding: '20px 0', 
+              padding: '20px', 
               borderBottom: '1px solid #333', 
               display: 'flex', 
-              justifyContent: 'space-between',
-              alignItems: 'center'
+              flexDirection: 'column', 
+              gap: '10px',
+              backgroundColor: index % 2 === 0 ? '#1e1e1e' : 'transparent', // Zebra striping
+              borderRadius: '8px'
             }}>
-              <div>
-                <h3 style={{ margin: '0 0 5px 0', fontSize: '1.1rem', textTransform: 'uppercase' }}>{report.type}</h3>
-                <span style={{ color: '#888', fontSize: '0.9rem' }}>{report.date}</span>
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <h3 style={{ margin: '0', fontSize: '1.2rem', color: '#ffbb33', textTransform: 'uppercase' }}>
+                    {report.type}
+                  </h3>
+                  <div style={{ color: '#aaa', fontSize: '0.95rem', marginTop: '4px' }}>
+                    📍 {report.location}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontWeight: 'bold', color: '#28a745', fontSize: '1.1rem' }}>{report.distance}</div>
+                  <div style={{ fontSize: '0.75rem', color: '#555', marginTop: '4px' }}>#{report.case_number}</div>
+                </div>
               </div>
-              <div style={{ fontWeight: 'bold', color: '#28a745', fontSize: '1.2rem' }}>
-                {report.distance}
+
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#888', fontSize: '0.85rem' }}>{report.date}</span>
+                <span style={{ 
+                  fontSize: '0.7rem', 
+                  padding: '3px 10px', 
+                  borderRadius: '12px', 
+                  backgroundColor: '#333',
+                  color: '#ccc',
+                  fontWeight: 'bold',
+                  letterSpacing: '0.5px'
+                }}>
+                  {report.precinct} PRECINCT
+                </span>
               </div>
             </div>
           ))}
